@@ -1,0 +1,364 @@
+@using Oqtane.Modules.Controls
+@using GIBS.Module.TaxRates.Services
+@using GIBS.Module.TaxRates.Models
+@using System.Linq
+@using System.Net
+
+@namespace GIBS.Module.TaxRates
+@inherits ModuleBase
+@inject ITaxRatesService TaxRatesService
+@inject NavigationManager NavigationManager
+@inject IStringLocalizer<Edit> Localizer
+
+<form @ref="form" class="@(validated ? " was-validated" : "needs-validation")" novalidate>
+    <div class="container">
+        <div class="row mb-1 align-items-center">
+            <Label Class="col-sm-3" For="municipality" HelpText="Enter a name" ResourceKey="Municipality">Municipality: </Label>
+            <div class="col-sm-9">
+                <input id="municipality" class="form-control" @bind="@_municipality" required />
+            </div>
+        </div>
+        <div class="row mb-1 align-items-center">
+            <Label Class="col-sm-3" For="fiscalyear" HelpText="Enter a fiscal year" ResourceKey="Fiscal_Year">Fiscal Year: </Label>
+            <div class="col-sm-9">
+                <input id="fiscalyear" class="form-control" @bind="@_fiscal_Year" required />
+            </div>
+        </div>
+        <div class="row mb-1 align-items-center">
+            <Label Class="col-sm-3" For="dorcode" HelpText="Enter a DOR Code" ResourceKey="DOR_Code">DOR Code: </Label>
+            <div class="col-sm-9">
+                <input id="dorcode" class="form-control" @bind="@_dor_Code" />
+            </div>
+        </div>
+        <div class="row mb-1 align-items-center">
+            <Label Class="col-sm-3" For="residential" HelpText="Enter the residential tax rate" ResourceKey="Residential">Residential Rate: </Label>
+            <div class="col-sm-9">
+                <input id="residential" type="number" step="any" class="form-control" @bind="@_residential" required />
+            </div>
+        </div>
+        <div class="row mb-1 align-items-center">
+            <Label Class="col-sm-3" For="openspace" HelpText="Enter the open space tax rate" ResourceKey="Open_Space">Open Space Rate: </Label>
+            <div class="col-sm-9">
+                <input id="openspace" type="number" step="any" class="form-control" @bind="@_open_Space" required />
+            </div>
+        </div>
+        <div class="row mb-1 align-items-center">
+            <Label Class="col-sm-3" For="commercial" HelpText="Enter the commercial tax rate" ResourceKey="Commercial">Commercial Rate: </Label>
+            <div class="col-sm-9">
+                <input id="commercial" type="number" step="any" class="form-control" @bind="@_commercial" required />
+            </div>
+        </div>
+        <div class="row mb-1 align-items-center">
+            <Label Class="col-sm-3" For="industrial" HelpText="Enter the industrial tax rate" ResourceKey="Industrial">Industrial Rate: </Label>
+            <div class="col-sm-9">
+                <input id="industrial" type="number" step="any" class="form-control" @bind="@_industrial" required />
+            </div>
+        </div>
+        <div class="row mb-1 align-items-center">
+            <Label Class="col-sm-3" For="personalproperty" HelpText="Enter the personal property tax rate" ResourceKey="Personal_Property">Personal Property Rate: </Label>
+            <div class="col-sm-9">
+                <input id="personalproperty" type="number" step="any" class="form-control" @bind="@_personal_Property" required />
+            </div>
+        </div>
+    </div>
+    <br />
+    @if (PageState.Action == "Edit")
+    {
+        <AuditInfo CreatedBy="@_createdby" CreatedOn="@_createdon" ModifiedBy="@_modifiedby" ModifiedOn="@_modifiedon"></AuditInfo>
+    }
+    <button type="button" class="btn btn-success" @onclick="Save">@Localizer["Save"]</button>
+    <button type="button" class="btn btn-primary" @onclick="ClearForm">@Localizer["New"]</button>
+    <NavLink class="btn btn-secondary" href="@NavigateUrl()">@Localizer["Cancel"]</NavLink>
+    <br /><br />
+</form>
+
+@if (_allTaxRatess == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    @if (_municipalities != null && _municipalities.Any())
+    {
+        <div class="d-flex align-items-center flex-wrap mt-3 mb-3">
+            <span class="me-2 fw-bold">@Localizer["Filter_Municipality"]:</span>
+            <a href="@NavigateUrl(ModuleState.ModuleId, "Add", !string.IsNullOrEmpty(_selectedYear) ? $"year={_selectedYear}" : null)" class="btn @(string.IsNullOrEmpty(_selectedMunicipality) ? "btn-primary" : "btn-link") me-1">All</a>
+            @foreach (var municipality in _municipalities)
+            {
+                <a href="@NavigateUrl(ModuleState.ModuleId, "Add", $"municipality={municipality}")" class="btn @(municipality == _selectedMunicipality ? "btn-primary" : "btn-link") me-1">@municipality</a>
+            }
+        </div>
+    }
+
+    @if (_fiscalYears != null && _fiscalYears.Any())
+    {
+        <div class="d-flex align-items-center flex-wrap mt-3 mb-3">
+            <span class="me-2 fw-bold">@Localizer["Filter_Fiscal_Year"]:</span>
+            <a href="@NavigateUrl(ModuleState.ModuleId, "Add", !string.IsNullOrEmpty(_selectedMunicipality) ? $"municipality={_selectedMunicipality}" : null)" class="btn @(string.IsNullOrEmpty(_selectedYear) ? "btn-primary" : "btn-link") me-1">All</a>
+            @foreach (var year in _fiscalYears)
+            {
+                <a href="@NavigateUrl(ModuleState.ModuleId, "Add", $"year={year}")" class="btn @(year == _selectedYear ? "btn-primary" : "btn-link") me-1">@year</a>
+            }
+        </div>
+    }
+
+    @if (_filteredTaxRatesList != null && _filteredTaxRatesList.Any())
+    {
+        <Pager Items="@_filteredTaxRatesList" PageSize="25" Class="table table-striped table-bordered table-list">
+            <Header>
+            <th style="width: 1px;">&nbsp;</th>
+            <th style="width: 1px;">&nbsp;</th>
+            <th>@Localizer["Fiscal_Year"]</th>
+            <th>@Localizer["Municipality"]</th>
+            <th>@Localizer["DOR_Code"]</th>
+            <th>@Localizer["Residential"]</th>
+            <th>@Localizer["Open_Space"]</th>
+            <th>@Localizer["Commercial"]</th>
+            <th>@Localizer["Industrial"]</th>
+            <th>@Localizer["Personal_Property"]</th>
+            </Header>
+            <Row>
+                <td><ActionLink Action="Edit" Parameters="@($"id=" + context.TaxRatesId.ToString())" ResourceKey="Edit" /></td>
+                <td><ActionDialog Header="Delete Tax Rate" Message="Are You Sure You Wish To Delete This Tax Rate?" Action="Delete" Security="SecurityAccessLevel.Edit" Class="btn btn-danger" OnClick="@(async () => await Delete(context))" ResourceKey="Delete" Id="@context.TaxRatesId.ToString()" /></td>
+                <td>@context.Fiscal_Year</td>
+                <td>@context.Municipality</td>
+                <td>@context.DOR_Code</td>
+                <td>@context.Residential.ToString("N2")</td>
+                <td>@context.Open_Space.ToString("N2")</td>
+                <td>@context.Commercial.ToString("N2")</td>
+                <td>@context.Industrial.ToString("N2")</td>
+                <td>@context.Personal_Property.ToString("N2")</td>
+            </Row>
+        </Pager>
+    }
+    else
+    {
+        <p>@Localizer["Message.DisplayNone"]</p>
+    }
+}
+
+
+@code {
+
+    public override SecurityAccessLevel SecurityAccessLevel => SecurityAccessLevel.Edit;
+
+    public override string Actions => "Add,Edit";
+
+    public override string Title => "Manage TaxRates";
+
+    public override List<Resource> Resources => new List<Resource>()
+    {
+        new Resource { ResourceType = ResourceType.Stylesheet, Url = ModulePath() + "Module.css" }
+    };
+
+    private ElementReference form;
+    private bool validated = false;
+
+    private List<TaxRates> _allTaxRatess;
+    private List<TaxRates> _filteredTaxRatesList;
+    private List<string> _fiscalYears;
+    private List<string> _municipalities;
+    private string _selectedYear;
+    private string _selectedMunicipality;
+
+    private int _id;
+    private string _municipality;
+    private string _fiscal_Year;
+    private string _dor_Code;
+    private decimal _residential;
+    private decimal _open_Space;
+    private decimal _commercial;
+    private decimal _industrial;
+    private decimal _personal_Property;
+    private string _createdby;
+    private DateTime _createdon;
+    private string _modifiedby;
+    private DateTime _modifiedon;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await LoadData();
+            if (_allTaxRatess.Any())
+            {
+                _municipalities = _allTaxRatess.Select(r => r.Municipality).Distinct().OrderBy(m => m).ToList();
+                _fiscalYears = _allTaxRatess.Select(r => r.Fiscal_Year).Distinct().OrderByDescending(y => y).ToList();
+
+                if (PageState.QueryString.ContainsKey("municipality"))
+                {
+                    _selectedMunicipality = WebUtility.UrlDecode(PageState.QueryString["municipality"]);
+                }
+                else
+                {
+                    _selectedMunicipality = null;
+                }
+                _selectedYear = PageState.QueryString.ContainsKey("year") ? PageState.QueryString["year"] : null;
+
+                if (string.IsNullOrEmpty(_selectedMunicipality) && string.IsNullOrEmpty(_selectedYear))
+                {
+
+                    _selectedYear = null;
+                    //DateTime.Now.Year.ToString();
+                }
+
+                FilterTaxRates();
+            }
+            else
+            {
+                _filteredTaxRatesList = new List<TaxRates>();
+            }
+
+            if (PageState.Action == "Edit" && int.TryParse(PageState.QueryString["id"], out var id))
+            {
+                _id = id;
+                var taxRate = _allTaxRatess.FirstOrDefault(item => item.TaxRatesId == _id);
+                if (taxRate != null)
+                {
+                    _municipality = taxRate.Municipality;
+                    _fiscal_Year = taxRate.Fiscal_Year;
+                    _dor_Code = taxRate.DOR_Code;
+                    _residential = taxRate.Residential;
+                    _open_Space = taxRate.Open_Space;
+                    _commercial = taxRate.Commercial;
+                    _industrial = taxRate.Industrial;
+                    _personal_Property = taxRate.Personal_Property;
+                    _createdby = taxRate.CreatedBy;
+                    _createdon = taxRate.CreatedOn;
+                    _modifiedby = taxRate.ModifiedBy;
+                    _modifiedon = taxRate.ModifiedOn;
+                }
+            }
+            else
+            {
+                ClearForm();
+            }
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error Loading TaxRates {Error}", ex.Message);
+            AddModuleMessage(Localizer["Message.LoadError"], MessageType.Error);
+        }
+    }
+
+    private async Task LoadData()
+    {
+        _allTaxRatess = await TaxRatesService.GetTaxRatessAsync(ModuleState.ModuleId);
+    }
+
+    private void FilterTaxRates()
+    {
+        if (_allTaxRatess != null)
+        {
+            var query = _allTaxRatess.AsQueryable();
+
+            if (!string.IsNullOrEmpty(_selectedMunicipality))
+            {
+                query = query.Where(r => r.Municipality == _selectedMunicipality);
+            }
+
+            if (!string.IsNullOrEmpty(_selectedYear))
+            {
+                query = query.Where(r => r.Fiscal_Year == _selectedYear);
+            }
+
+            _filteredTaxRatesList = query.OrderByDescending(r => r.Fiscal_Year).ThenBy(r => r.Municipality).ToList();
+        }
+    }
+
+    private void ClearForm()
+    {
+        validated = false;
+        _id = 0;
+        _municipality = string.Empty;
+        _fiscal_Year = DateTime.Now.Year.ToString();
+        _dor_Code = string.Empty;
+        _residential = 0;
+        _open_Space = 0;
+        _commercial = 0;
+        _industrial = 0;
+        _personal_Property = 0;
+        _createdby = string.Empty;
+        _createdon = default;
+        _modifiedby = string.Empty;
+        _modifiedon = default;
+        PageState.Action = "Add";
+    }
+
+    private async Task Save()
+    {
+        try
+        {
+            validated = true;
+            var interop = new Oqtane.UI.Interop(JSRuntime);
+            if (await interop.FormValid(form))
+            {
+                if (PageState.Action == "Add")
+                {
+                    var taxRate = new TaxRates
+                    {
+                        ModuleId = ModuleState.ModuleId,
+                        Municipality = _municipality,
+                        Fiscal_Year = _fiscal_Year,
+                        DOR_Code = _dor_Code,
+                        Residential = _residential,
+                        Open_Space = _open_Space,
+                        Commercial = _commercial,
+                        Industrial = _industrial,
+                        Personal_Property = _personal_Property
+                    };
+                    await TaxRatesService.AddTaxRatesAsync(taxRate);
+                    await logger.LogInformation("Tax Rate Added {TaxRate}", taxRate);
+                }
+                else
+                {
+                    var taxRate = _allTaxRatess.FirstOrDefault(item => item.TaxRatesId == _id);
+                    if (taxRate != null)
+                    {
+                        taxRate.Municipality = _municipality;
+                        taxRate.Fiscal_Year = _fiscal_Year;
+                        taxRate.DOR_Code = _dor_Code;
+                        taxRate.Residential = _residential;
+                        taxRate.Open_Space = _open_Space;
+                        taxRate.Commercial = _commercial;
+                        taxRate.Industrial = _industrial;
+                        taxRate.Personal_Property = _personal_Property;
+                        await TaxRatesService.UpdateTaxRatesAsync(taxRate);
+                        await logger.LogInformation("Tax Rate Updated {TaxRate}", taxRate);
+                    }
+                }
+                ClearForm();
+                await LoadData();
+                FilterTaxRates();
+                StateHasChanged();
+            }
+            else
+            {
+                AddModuleMessage(Localizer["Message.SaveValidation"], MessageType.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error Saving Tax Rate {Error}", ex.Message);
+            AddModuleMessage(Localizer["Message.SaveError"], MessageType.Error);
+        }
+    }
+
+    private async Task Delete(TaxRates taxRate)
+    {
+        try
+        {
+            await TaxRatesService.DeleteTaxRatesAsync(taxRate.TaxRatesId, ModuleState.ModuleId);
+            await logger.LogInformation("Tax Rate Deleted {TaxRate}", taxRate);
+            await LoadData();
+            FilterTaxRates();
+            ClearForm();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error Deleting Tax Rate {TaxRate} {Error}", taxRate, ex.Message);
+            AddModuleMessage(Localizer["Message.DeleteError"], MessageType.Error);
+        }
+    }
+}

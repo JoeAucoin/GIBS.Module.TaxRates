@@ -1,0 +1,181 @@
+@using System.Linq
+@using GIBS.Module.TaxRates.Services
+@using GIBS.Module.TaxRates.Models
+@using Oqtane.Services
+@using System.Net
+
+@namespace GIBS.Module.TaxRates
+@inherits ModuleBase
+@inject ITaxRatesService TaxRatesService
+@inject NavigationManager NavigationManager
+@inject ISettingService SettingService
+@inject IStringLocalizer<Index> Localizer
+
+@if (_allTaxRatess == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="text-end"><ActionLink Action="Add" Security="SecurityAccessLevel.Edit" Text="Add TaxRates" IconName="plus" IconOnly ResourceKey="Add" /></div>
+
+    @if (_municipalities != null && _municipalities.Any())
+    {
+        <div class="d-flex align-items-center flex-wrap mt-3 mb-3">
+            <span class="me-2 fw-bold">@Localizer["Filter_Municipality"]</span>
+            <a href="@NavigateUrl(PageState.Page.Path, !string.IsNullOrEmpty(_selectedYear) ? $"year={_selectedYear}" : null)" class="btn @(string.IsNullOrEmpty(_selectedMunicipality) ? "btn-primary" : "btn-link") me-1">All</a>
+            @foreach (var municipality in _municipalities)
+            {
+                <a href="@NavigateUrl(PageState.Page.Path, $"municipality={municipality}")" class="btn @(municipality == _selectedMunicipality ? "btn-primary" : "btn-link") me-1">@municipality</a>
+            }
+        </div>
+    }
+
+
+
+    @if (_TaxRatess != null && _TaxRatess.Any())
+    {
+        <div class="table-responsive">
+        <Pager Items="@_TaxRatess" PageSize="25" Class="table table-striped table-bordered table-list">
+            <Header>
+            <th class="text-center">@Localizer["Fiscal_Year"]</th>
+            <th class="text-center">@Localizer["Municipality"]</th>
+            <th class="text-center">@Localizer["Residential"]</th>
+            <th class="text-center">@Localizer["Commercial"]</th>
+            <th class="text-center">@Localizer["Industrial"]</th>
+            <th class="text-center">@Localizer["Personal_Property"]</th>
+            </Header>
+            <Row>
+                <td class="text-center">@context.Fiscal_Year</td>
+                <td>@context.Municipality</td>
+                <td class="text-center">$@context.Residential.ToString("N2")</td>
+                <td class="text-center">$@context.Commercial.ToString("N2")</td>
+                <td class="text-center">$@context.Industrial.ToString("N2")</td>
+                <td class="text-center">$@context.Personal_Property.ToString("N2")</td>
+            </Row>
+        </Pager>
+        </div>
+    }
+    else
+    {
+        <p>@Localizer["Message.DisplayNone"]</p>
+    }
+
+    @if (_fiscalYears != null && _fiscalYears.Any())
+    {
+        <div class="d-flex align-items-center flex-wrap mt-3 mb-3">
+            <span class="me-2 fw-bold">@Localizer["Filter_Fiscal_Year"]</span>
+
+            @foreach (var year in _fiscalYears)
+            {
+                <a href="@NavigateUrl(PageState.Page.Path, $"year={year}")" class="btn @(year == _selectedYear ? "btn-primary" : "btn-link") me-1">@year</a>
+            }
+        </div>
+    }
+}
+
+@code {
+    public override string RenderMode => RenderModes.Static;
+
+    public override List<Resource> Resources => new List<Resource>()
+    {
+        new Resource { ResourceType = ResourceType.Stylesheet, Url = ModulePath() + "Module.css" },
+        new Resource { ResourceType = ResourceType.Script, Url = ModulePath() + "Module.js" }
+    };
+
+    private List<TaxRates> _allTaxRatess;
+    private List<TaxRates> _TaxRatess;
+    private List<string> _fiscalYears;
+    private List<string> _municipalities;
+    private string _selectedYear;
+    private string _selectedMunicipality;
+    private string _myPageTitle;
+    private string _pageName = "Tax Rates";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var settings = await SettingService.GetModuleSettingsAsync(ModuleState.ModuleId);
+            _pageName = SettingService.GetSetting(settings, "SettingName", "Tax Rates");
+            _allTaxRatess = await TaxRatesService.GetTaxRatessAsync(ModuleState.ModuleId);
+            if (_allTaxRatess.Any())
+            {
+                _municipalities = _allTaxRatess.Select(r => r.Municipality).Distinct().OrderBy(m => m).ToList();
+                _fiscalYears = _allTaxRatess.Select(r => r.Fiscal_Year).Distinct().OrderByDescending(y => y).ToList();
+
+                if (PageState.QueryString.ContainsKey("municipality"))
+                {
+                    _selectedMunicipality = WebUtility.UrlDecode(PageState.QueryString["municipality"]);
+                    _myPageTitle = _selectedMunicipality.ToString() + " " + _pageName.ToString();
+                    SetPageTitle(_myPageTitle.ToString());
+                }
+                else
+                {
+                    _selectedMunicipality = null;
+                }
+
+                _selectedYear = PageState.QueryString.ContainsKey("year") ? PageState.QueryString["year"] : null;
+
+                // Default view: if no filter is set, show current year
+                if (string.IsNullOrEmpty(_selectedMunicipality) && string.IsNullOrEmpty(_selectedYear))
+                {
+                    _selectedYear = DateTime.Now.Year.ToString();
+                    // _myPageTitle = _selectedYear.ToString() + " " + _pageName.ToString();
+                    // SetPageTitle(_myPageTitle.ToString());
+                }
+
+                FilterTaxRates();
+            }
+            else
+            {
+                _TaxRatess = new List<TaxRates>();
+            }
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error Loading TaxRates {Error}", ex.Message);
+            AddModuleMessage(Localizer["Message.LoadError"], MessageType.Error);
+        }
+    }
+
+    private void FilterTaxRates()
+    {
+        if (_allTaxRatess != null)
+        {
+            var query = _allTaxRatess.AsQueryable();
+
+            if (!string.IsNullOrEmpty(_selectedMunicipality))
+            {
+                query = query.Where(r => r.Municipality == _selectedMunicipality);
+            }
+
+            if (!string.IsNullOrEmpty(_selectedYear))
+            {
+                query = query.Where(r => r.Fiscal_Year == _selectedYear);
+                _myPageTitle = _selectedYear.ToString() + " " + _pageName.ToString();
+                    SetPageTitle(_myPageTitle.ToString());
+            }
+
+            _TaxRatess = query.OrderByDescending(r => r.Fiscal_Year).ThenBy(r => r.Municipality).ToList();
+        }
+    }
+
+    private async Task Delete(TaxRates TaxRates)
+    {
+        try
+        {
+            await TaxRatesService.DeleteTaxRatesAsync(TaxRates.TaxRatesId, ModuleState.ModuleId);
+            await logger.LogInformation("TaxRates Deleted {TaxRates}", TaxRates);
+
+            // Reload all data and re-apply filters
+            await OnInitializedAsync();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error Deleting TaxRates {TaxRates} {Error}", TaxRates, ex.Message);
+            AddModuleMessage(Localizer["Message.DeleteError"], MessageType.Error);
+        }
+    }
+}
