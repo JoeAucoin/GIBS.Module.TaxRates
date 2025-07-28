@@ -23,7 +23,7 @@
         try
         {
             Dictionary<string, string> settings = await SettingService.GetModuleSettingsAsync(ModuleState.ModuleId);
-            _value = SettingService.GetSetting(settings, "SettingName", "Tax Eates");
+            _value = SettingService.GetSetting(settings, "SettingName", "Tax Rates");
         }
         catch (Exception ex)
         {

@@ -3,6 +3,7 @@
 @using GIBS.Module.TaxRates.Models
 @using Oqtane.Services
 @using System.Net
+@using System.Collections.Generic
 
 @namespace GIBS.Module.TaxRates
 @inherits ModuleBase
@@ -19,6 +20,58 @@ else
 {
     <div class="text-end"><ActionLink Action="Add" Security="SecurityAccessLevel.Edit" Text="Add TaxRates" IconName="plus" IconOnly ResourceKey="Add" /></div>
 
+
+
+    @if (_displayedFiscalYears != null && _displayedFiscalYears.Any())
+    {
+        <div class="d-flex align-items-center flex-wrap mt-3 mb-3">
+            <span class="me-2 fw-bold">@Localizer["Filter_Fiscal_Year"]</span>
+
+            @if (_yearPage > 0)
+            {
+                <a href="@GetYearPagerUrl(_yearPage - 1)" class="btn btn-link me-1">&lt;&lt;</a>
+            }
+
+            @foreach (var year in _displayedFiscalYears)
+            {
+                <a href="@GetYearFilterUrl(year)" class="btn @(year == _selectedYear ? "btn-primary" : "btn-link") me-1">@year</a>
+            }
+
+            @if ((_yearPage + 1) * YearPageSize < _fiscalYears.Count)
+            {
+                <a href="@GetYearPagerUrl(_yearPage + 1)" class="btn btn-link me-1">&gt;&gt;</a>
+            }
+        </div>
+    }
+
+    @if (_TaxRatess != null && _TaxRatess.Any())
+    {
+        <div class="table-responsive">
+            <Pager Items="@_TaxRatess" PageSize="25" Class="table table-striped table-bordered table-list">
+                <Header>
+                    <th class="text-center">@Localizer["Fiscal_Year"]</th>
+                    <th class="text-center">@Localizer["Municipality"]</th>
+                    <th class="text-center">@Localizer["Residential"]</th>
+                    <th class="text-center">@Localizer["Commercial"]</th>
+                    <th class="text-center">@Localizer["Industrial"]</th>
+                    <th class="text-center">@Localizer["Personal_Property"]</th>
+                </Header>
+                <Row>
+                    <td class="text-center">@context.Fiscal_Year</td>
+                    <td>@context.Municipality</td>
+                    <td class="text-center">$@context.Residential.ToString("N2")</td>
+                    <td class="text-center">$@context.Commercial.ToString("N2")</td>
+                    <td class="text-center">$@context.Industrial.ToString("N2")</td>
+                    <td class="text-center">$@context.Personal_Property.ToString("N2")</td>
+                </Row>
+            </Pager>
+        </div>
+    }
+    else
+    {
+        <p>@Localizer["Message.DisplayNone"]</p>
+    }
+
     @if (_municipalities != null && _municipalities.Any())
     {
         <div class="d-flex align-items-center flex-wrap mt-3 mb-3">
@@ -31,47 +84,6 @@ else
         </div>
     }
 
-
-
-    @if (_TaxRatess != null && _TaxRatess.Any())
-    {
-        <div class="table-responsive">
-        <Pager Items="@_TaxRatess" PageSize="25" Class="table table-striped table-bordered table-list">
-            <Header>
-            <th class="text-center">@Localizer["Fiscal_Year"]</th>
-            <th class="text-center">@Localizer["Municipality"]</th>
-            <th class="text-center">@Localizer["Residential"]</th>
-            <th class="text-center">@Localizer["Commercial"]</th>
-            <th class="text-center">@Localizer["Industrial"]</th>
-            <th class="text-center">@Localizer["Personal_Property"]</th>
-            </Header>
-            <Row>
-                <td class="text-center">@context.Fiscal_Year</td>
-                <td>@context.Municipality</td>
-                <td class="text-center">$@context.Residential.ToString("N2")</td>
-                <td class="text-center">$@context.Commercial.ToString("N2")</td>
-                <td class="text-center">$@context.Industrial.ToString("N2")</td>
-                <td class="text-center">$@context.Personal_Property.ToString("N2")</td>
-            </Row>
-        </Pager>
-        </div>
-    }
-    else
-    {
-        <p>@Localizer["Message.DisplayNone"]</p>
-    }
-
-    @if (_fiscalYears != null && _fiscalYears.Any())
-    {
-        <div class="d-flex align-items-center flex-wrap mt-3 mb-3">
-            <span class="me-2 fw-bold">@Localizer["Filter_Fiscal_Year"]</span>
-
-            @foreach (var year in _fiscalYears)
-            {
-                <a href="@NavigateUrl(PageState.Page.Path, $"year={year}")" class="btn @(year == _selectedYear ? "btn-primary" : "btn-link") me-1">@year</a>
-            }
-        </div>
-    }
 }
 
 @code {
@@ -83,9 +95,13 @@ else
         new Resource { ResourceType = ResourceType.Script, Url = ModulePath() + "Module.js" }
     };
 
+    private const int YearPageSize = 8;
+    private int _yearPage = 0;
+
     private List<TaxRates> _allTaxRatess;
     private List<TaxRates> _TaxRatess;
     private List<string> _fiscalYears;
+    private List<string> _displayedFiscalYears;
     private List<string> _municipalities;
     private string _selectedYear;
     private string _selectedMunicipality;
@@ -104,6 +120,8 @@ else
                 _municipalities = _allTaxRatess.Select(r => r.Municipality).Distinct().OrderBy(m => m).ToList();
                 _fiscalYears = _allTaxRatess.Select(r => r.Fiscal_Year).Distinct().OrderByDescending(y => y).ToList();
 
+                _yearPage = PageState.QueryString.ContainsKey("yearpage") && int.TryParse(PageState.QueryString["yearpage"], out var page) ? page : 0;
+
                 if (PageState.QueryString.ContainsKey("municipality"))
                 {
                     _selectedMunicipality = WebUtility.UrlDecode(PageState.QueryString["municipality"]);
@@ -117,15 +135,14 @@ else
 
                 _selectedYear = PageState.QueryString.ContainsKey("year") ? PageState.QueryString["year"] : null;
 
-                // Default view: if no filter is set, show current year
                 if (string.IsNullOrEmpty(_selectedMunicipality) && string.IsNullOrEmpty(_selectedYear))
                 {
-                    _selectedYear = DateTime.Now.Year.ToString();
-                    // _myPageTitle = _selectedYear.ToString() + " " + _pageName.ToString();
-                    // SetPageTitle(_myPageTitle.ToString());
+                    _selectedYear = _fiscalYears.FirstOrDefault();
                 }
 
                 FilterTaxRates();
+
+                _displayedFiscalYears = _fiscalYears.Skip(_yearPage * YearPageSize).Take(YearPageSize).ToList();
             }
             else
             {
@@ -154,11 +171,39 @@ else
             {
                 query = query.Where(r => r.Fiscal_Year == _selectedYear);
                 _myPageTitle = _selectedYear.ToString() + " " + _pageName.ToString();
-                    SetPageTitle(_myPageTitle.ToString());
+                SetPageTitle(_myPageTitle.ToString());
             }
 
             _TaxRatess = query.OrderByDescending(r => r.Fiscal_Year).ThenBy(r => r.Municipality).ToList();
         }
+    }
+
+    private string GetYearPagerUrl(int page)
+    {
+        var parameters = new List<string>();
+        if (!string.IsNullOrEmpty(_selectedMunicipality))
+        {
+            parameters.Add($"municipality={_selectedMunicipality}");
+        }
+        parameters.Add($"yearpage={page}");
+        return NavigateUrl(PageState.Page.Path, string.Join("&", parameters));
+    }
+
+    private string GetYearFilterUrl(string year)
+    {
+        var parameters = new List<string>();
+        if (!string.IsNullOrEmpty(_selectedMunicipality))
+        {
+            parameters.Add($"municipality={_selectedMunicipality}");
+        }
+        parameters.Add($"year={year}");
+        var yearIndex = _fiscalYears.IndexOf(year);
+        var page = yearIndex / YearPageSize;
+        if (page > 0)
+        {
+            parameters.Add($"yearpage={page}");
+        }
+        return NavigateUrl(PageState.Page.Path, string.Join("&", parameters));
     }
 
     private async Task Delete(TaxRates TaxRates)
@@ -168,7 +213,6 @@ else
             await TaxRatesService.DeleteTaxRatesAsync(TaxRates.TaxRatesId, ModuleState.ModuleId);
             await logger.LogInformation("TaxRates Deleted {TaxRates}", TaxRates);
 
-            // Reload all data and re-apply filters
             await OnInitializedAsync();
             StateHasChanged();
         }
