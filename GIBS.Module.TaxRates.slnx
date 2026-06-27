@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="../oqtane.framework-6.1.2-Source/Oqtane.Server/Oqtane.Server.csproj">
+    <Build Project="false" />
+  </Project>
+  <Project Path="Client/GIBS.Module.TaxRates.Client.csproj" />
+  <Project Path="Package/GIBS.Module.TaxRates.Package.csproj" />
+  <Project Path="Server/GIBS.Module.TaxRates.Server.csproj" />
+  <Project Path="Shared/GIBS.Module.TaxRates.Shared.csproj" />
+</Solution>
