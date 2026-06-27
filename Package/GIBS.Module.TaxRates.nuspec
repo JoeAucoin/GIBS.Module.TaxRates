@@ -2,11 +2,11 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>$projectname$</id>
-        <version>1.0.1</version>
-        <authors>GIBS</authors>
+        <version>10.0.1</version>
+        <authors>Joseph M Aucoin</authors>
         <owners>GIBS</owners>
         <title>TaxRates</title>
-        <description>Massachusetts Tax Rates</description>
+        <description>Real Estate Tax Rates</description>
         <copyright>GIBS</copyright>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <license type="expression">MIT</license>

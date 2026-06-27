@@ -3,11 +3,11 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
-    <Version>1.0.1</Version>
+    <Version>10.0.1</Version>
     <Product>GIBS.Module.TaxRates</Product>
-    <Authors>GIBS</Authors>
+    <Authors>Joseph M Aucoin</Authors>
     <Company>GIBS</Company>
-    <Description>Massachusetts Tax Rates</Description>
+    <Description>Real Estate Tax Rates</Description>
     <Copyright>GIBS</Copyright>
     <AssemblyName>GIBS.Module.TaxRates.Server.Oqtane</AssemblyName>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
